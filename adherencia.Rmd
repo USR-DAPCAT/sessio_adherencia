@@ -1,5 +1,5 @@
 ---
-title: '"Adherencia" basat en registres clínics'
+title: '"Adherència" basat en registres clínics'
 author: "Jordi Real. USR-BCN "
 date: "13/2/2020"
 output: ioslides_presentation
@@ -8,39 +8,89 @@ font_adjustment: -3
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F)
 
 # library(cowplot)
 
-link_source<-paste0("https://github.com/jrealgatius/Stat_codis/blob/master/funcions_propies.R","?raw=T")
-devtools::source_url(link_source)
+
 ```
 
 
 ```{r carregar_dades, include=FALSE}
 
 
-dt_poblacio<-readRDS(here::here("dades","METPLUS_entregable_poblacio_20181126_190346.rds")) %>%
-  mutate(idp=stringr::str_sub(idp,1,8))
-dt_facturats<-readRDS(here::here("dades","METPLUS_entregable_farmacs_facturats_20181126_190346.rds")) %>%
-  mutate(idp=stringr::str_sub(idp,1,8))
-dt_prescrits<-readRDS(here::here("dades","METPLUS_entregable_farmacs_prescrits_20181126_190346.rds")) %>%
-  mutate(idp=stringr::str_sub(idp,1,8))
+link_source<-paste0("https://github.com/jrealgatius/Stat_codis/blob/master/funcions_propies.R","?raw=T")
+devtools::source_url(link_source)
+
+load(here::here("dades","adherence_data.Rdata"))
 
 
-# Mostra 
-dt_metplus<-readRDS(here::here("dades","mostra_metplus.RDS")) %>%
-  mutate(idp=stringr::str_sub(idp,1,8))
-
-# Filtrar per mostra
-dt_facturats <- dt_facturats %>% semi_join(dt_metplus)
-dt_prescrits<- dt_prescrits %>% semi_join(dt_metplus)
 
 
-# SElecciono només farmacs d'estudi
-dt_prescrits<-dt_prescrits %>% filter(agr=="IDPP4" | agr=="SU" | agr=="METplus IDPP4" | agr=="iSGLT2" | agr=="METplus ISGTL2") %>% select(idp,cod,agr,dat,dbaixa)
+# dt_poblacio<-readRDS(here::here("dades","METPLUS_entregable_poblacio_20181126_190346.rds")) %>%
+#   mutate(idp=stringr::str_sub(idp,1,8))
+# dt_facturats<-readRDS(here::here("dades","METPLUS_entregable_farmacs_facturats_20181126_190346.rds")) %>%
+#   mutate(idp=stringr::str_sub(idp,1,8))
+# dt_prescrits<-readRDS(here::here("dades","METPLUS_entregable_farmacs_prescrits_20181126_190346.rds")) %>%
+#   mutate(idp=stringr::str_sub(idp,1,8))
+# 
+# # MetPlus 
+# dt_metplus<-readRDS(here::here("dades","metplus_complet.Rds")) %>%
+#   mutate(idp=stringr::str_sub(idp,1,8)) %>% 
+#   select(c("idp","grup","dtindex","sortida","datafiOT","datafi_seguiment","tempsTX.GRUP"))
+# 
+# # Filtrar per mostra només inclosos en MET+
+# dt_facturats <- dt_facturats %>% semi_join(dt_metplus,by="idp")
+# dt_prescrits<- dt_prescrits %>% semi_join(dt_metplus,by="idp")
+# 
+# # SElecciono només farmacs d'estudi
+# dt_prescrits<-dt_prescrits %>% filter(agr=="IDPP4" | agr=="SU" | agr=="METplus IDPP4" | agr=="iSGLT2" | agr=="METplus ISGTL2") %>% select(idp,cod,agr,dat,dbaixa)
+# 
+# dt_facturats<-dt_facturats %>% filter(agr=="IDPP4" | agr=="SU" | agr=="METplus IDPP4" | agr=="iSGLT2" | agr=="METplus ISGTL2")
+# 
+# # Selecciono ids mostra
+# dt_ids<-dt_facturats %>% distinct(idp) %>% rbind(dt_prescrits %>% distinct(idp)) %>% distinct(idp)
+# dt_metplus<-dt_metplus %>% semi_join(dt_ids,by="idp")
 
-dt_facturats<-dt_facturats %>% filter(agr=="IDPP4" | agr=="SU" | agr=="METplus IDPP4" | agr=="iSGLT2" | agr=="METplus ISGTL2")
+# save.image(here::here("dades","adherence_data.Rdata"))
+
+
+
+# Funció per generar mapes
+
+generar_mapa<-function(gap=1,set_seed=9) {
+# gap<-1 # gap: gap=45
+# set_seed<-9  # set_seed=12
+
+# 1. Mostrejar prescrits
+prescrits_id<-mostreig_ids(dt=dt_prescrits,id="idp",set_seed=set_seed,n_mostra = 1)
+# 1.2. Seleccionar facturats del mostrejat
+facturats_id<-dt_facturats %>% semi_join(prescrits_id,by="idp")
+# 2.agregar solapaments tant de prescrits com facturats 
+prescrits_id<-agregar_solapaments_gaps(dt=prescrits_id,id="idp",datainici = "dat",datafinal = "dbaixa",gap=gap)
+facturats_id<-facturats_id %>% mutate(dat=lubridate::ymd(paste0(as.character(dat),"15")),dbaixa=dat+(30*env)) %>% 
+  agregar_solapaments_gaps(id="idp",datainici = "dat",datafinal = "dbaixa",gap=gap)
+# 2.2. Juntar prescrits + dispensats
+total_id<-mutate(prescrits_id,tipus="Prescrit") %>% rbind(mutate(facturats_id,tipus="Dispensat"))
+total_id<-total_id %>% unite(id_kk,c(idp,tipus),remove = F)
+# Mapejar
+mapa<-MAP_ggplot(dades=total_id,datainicial = "dat",datafinal = "dbaixa",id="id_kk",grup_linea = "tipus",grup_color = "tipus") 
+
+# sumar temps acumulats
+temps_per_id<-total_id %>% mutate(temps=dbaixa-dat) %>% group_by(idp,tipus) %>% summarise(Temps=sum(temps))
+# kable(temps_per_id, caption = "Temps acumulat de farmacs prescrits/facturat") %>% kableExtra::kable_styling()
+tableMPR<-(temps_per_id$Temps[1] %>% as.numeric())/temps_per_id$Temps[2] %>% as.numeric() %>% 
+  as_tibble() %>% 
+  select(MPR=value) 
+# 3. Posar-ho en una taula
+tableMPR<-tableMPR %>% 
+  mutate(D=temps_per_id$Temps[1],P=temps_per_id$Temps[2],
+         Adherence=if_else(MPR>0.8,"Good: >=0.8","Low: <0.8")) %>% 
+  select(D,P,MPR,Adherence)
+
+list(plot=mapa,taula=tableMPR)
+}
+
 
 
 ```
@@ -49,7 +99,7 @@ dt_facturats<-dt_facturats %>% filter(agr=="IDPP4" | agr=="SU" | agr=="METplus I
 
 <left>
 
-- Estudi
+- Met+
 
 - "Adherencia" & MPR
 
@@ -67,54 +117,130 @@ dt_facturats<-dt_facturats %>% filter(agr=="IDPP4" | agr=="SU" | agr=="METplus I
 
 ## Estudi Met+ {.smaller}
 
-- 3 grups d'antidiabetics: Sulfonilurea, IDPP-4 o un iSGLT2. 
+- 3 grups DM2 amb inici d'antidiabetics: Sulfonilurea, IDPP-4 o un iSGLT2. 
 
-- Pacients DM2 tractats amb metformina i insuficient control glucémic.
+- Tractats amb metformina previa i insuficient control glucémic.
 
-- Objectius: 
+- Objectius: Avaluar   
 
-    - Reducció de HbA1c i pes després de l'addició de determinats Antidiabetics (SU, iDPP-4i / ISGLT-2i)  (up to 24 months)
+    - Principal: Canvis en HbA1c i pes després de l'addició (Fins 24 mesos)
 
-    - *Adherencia al tratament per cada grup*
+    - **Secundaris 5: Adherencia al tratament per cada grup**
 
-    - % suspensions / abandons del tractament (persistencia del tratamiento).
+    - Secundaris 6: Suspensions / abandons del tractament (persistencia al tratactamen)
 
 
 ## Taxa de possessió de medicament (MPR) {.smaller}
 
-    - Adherencia en funció d'aquesta taxa: Medication Possession Ratio (MPR) 
+- The therapeutic adherence will be assessed through pharmacy invoice data (drug dispensing)
+
+- For each patient will be calculated The medication possession ratio (MPR)
 
 <center> 
-$MPR = \frac{TempsDispensció} {TempsTranscorreguts}*100$ 
+$MPR = \frac{TempsDispensació(D)} {TempsTranscorregut(P)}$ 
 </center>
 
 On: 
 
-- *Total Dies Dispensats*: Temps de dispensació del farmac d'estudi ("real").
+- D: Temps de dispensat ("real) del farmac d'estudi
 
-- *Total Dies Transcorreguts*: Temps de prescripció ("teoric") durant el periode de seguiment o fins prematura finalització.
+- P: Temps prescrit ("teoric") durant periode de seguiment o fins la prematura finalització
 
-## Adherença {.smaller}
+## Adherenia {.smaller}
 
 <center> 
- $MPR = \frac{f(D) } { f(P)}*100 \ge0$, 
+ $MPR = \frac{f(D) } { f(P)} \in [0-1]$, 
 
-<font size="4"> on D= Dispensació acumulada, y P = Periode de prescripció </font>
+<font size="4"> on D= Dispensació acumulada, i P = Periode de prescripció </font>
 
 </center> 
 
-|: Adherença |  Criteri    :|
+| Adherença |  Criteri      |
 |:---------:+:-------------:|
-| Good      |$MPR \ge 80$%  |
-| Low       |$MPR < 80$%    |
+| Good      |$MPR \ge 0.8$  |
+| Low       |$MPR < 0.8$    |
+
+<br />
+> Característiques / Assumpcions: 
+
+    - Si D=0 --> MPR=0 
+    - Dispensació va vinculada a una prescripció. Per tant s'ha de complir:
+    
+  $D \le P$ <br/> 
+  $D \in P$ <br/>
+  -Si D (observada) > P (observada)  -> MPR=1 
+  
+## Exemples
+- Tractactament dispensat i prescrit
+
+```{r, results = 'hide'}
+# Parametres:
+# Discontinuitat (gap=45)
+gap<-1 # gap: gap=45
+set_seed<-9  # set_seed=12
+
+# Mostrejar prescrits
+prescrits_id<-mostreig_ids(dt=dt_prescrits,id="idp",set_seed=set_seed,n_mostra = 1)
+# kable(prescrits_id) %>% kableExtra::kable_styling()
+facturats_id<-dt_facturats %>% semi_join(prescrits_id,by="idp")
+
+kable(prescrits_id, caption = "Historic de farmacs prescrits") %>% kableExtra::kable_styling()
+kable(facturats_id, caption = "Historic de farmacs dispensats") %>% kableExtra::kable_styling()
+
+```
 
 
-- Característiques / Assumpcions: 
+```{r, message=FALSE,echo=F,results = 'hide'}
+# Eliminar solapaments 
+prescrits_id<-agregar_solapaments_gaps(dt=prescrits_id,id="idp",datainici = "dat",datafinal = "dbaixa",gap=gap)
+facturats_id<-facturats_id %>% mutate(dat=lubridate::ymd(paste0(as.character(dat),"15")),dbaixa=dat+(30*env)) %>% 
+  agregar_solapaments_gaps(id="idp",datainici = "dat",datafinal = "dbaixa",gap=gap)
 
-    - $MPR\ge0$ i $\le100$%
-    - Si D=0 -> MPR=0 
-    - Si $D>P$ -> MPR>100% --> MPR=100%
-    - Dispensació implica prescripció per tant D > P : P=D: MPR=100% 
+# Juntar prescrits + dispensats
+total_id<-mutate(prescrits_id,tipus="Prescrit") %>% rbind(mutate(facturats_id,tipus="Dispensat"))
+```
+
+```{r, message=FALSE,echo=F, fig.asp=0.3}
+# Format idp
+total_id<-total_id %>% unite(id_kk,c(idp,tipus),remove = F)
+MAP_ggplot(dades=total_id,datainicial = "dat",datafinal = "dbaixa",id="id_kk",grup_linea = "tipus",grup_color = "tipus") 
+
+```
+
+```{r}
+temps_per_id<-total_id %>% mutate(temps=dbaixa-dat) %>% group_by(idp,tipus) %>% summarise(Temps=sum(temps))
+# kable(temps_per_id, caption = "Temps acumulat de farmacs prescrits/facturat") %>% kableExtra::kable_styling()
+tableMPR<-(temps_per_id$Temps[1] %>% as.numeric())/temps_per_id$Temps[2] %>% as.numeric() %>% 
+  as_tibble() %>% 
+  select(MPR=value) 
+
+tableMPR<-tableMPR %>% 
+  mutate(D=temps_per_id$Temps[1],P=temps_per_id$Temps[2],
+  Adherence=if_else(MPR>0.8,"Good: >=0.8","Low: <0.8")) %>% 
+  select(D,P,MPR,Adherence)
+kable(tableMPR,digits=3)%>% kableExtra::kable_styling()
+```
+
+
+```{r,message=FALSE,echo=F,fig.asp=0.3,results = 'hide',include=F}
+pp<-generar_mapa(gap=2,set_seed=68)
+```
+
+## Un altre exemple
+
+```{r message=FALSE, echo=F, fig.asp=0.3, warning=FALSE}
+
+pp$plot
+
+```
+
+
+```{r}
+
+pp$taula %>% kable(digits=3)%>% kableExtra::kable_styling()
+
+
+```
 
 
 ## Quines dades disposem? {.smaller}
@@ -226,7 +352,7 @@ facturats_id<-facturats_id %>%
   mutate(dat=lubridate::ymd(paste0(as.character(dat),"15")),datafi=dat+(30*env))
 
 MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafi",
-            id="idp",grup_color = "agr")
+            id="idp",grup_color = "cod")
 
 ```
 
@@ -250,7 +376,7 @@ facturats_id<-facturats_id %>%
 facturats_id<-facturats_id %>%  mutate(datafi=dat+(30*env)) 
 
 MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafi",
-            id="idp")
+            id="idp",grup_color = "cod")
 
 ```
 
