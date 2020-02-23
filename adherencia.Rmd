@@ -1,10 +1,12 @@
 ---
 title: '"Adherència" basat en registres clínics'
 author: "Jordi Real. USR-BCN "
-date: "13/2/2020"
+date: "03/03/2020"
 output: ioslides_presentation
+footer: "USR Barcelona, DAPCAT 2020"  
 logo: "logoIDIAP.png"
-font_adjustment: -3
+font_adjustment: -5
+
 ---
 
 ```{r setup, include=FALSE}
@@ -14,84 +16,79 @@ library(ggplot2)
 library(dplyr)
 
 
-
 ```
 
 
 ```{r carregar_dades, include=FALSE}
-
-
 load(here::here("dades","adherence_data.Rdata"))
 
 link_source<-paste0("https://github.com/jrealgatius/Stat_codis/blob/master/funcions_propies.R","?raw=T")
 devtools::source_url(link_source)
 
+conductor_facmacs<-read_excel(here::here("dades","cataleg_met.xls"),col_types = "text") %>% 
+  select(cod,factor_conversio_farmacs) %>% filter(!is.na(factor_conversio_farmacs)) %>% unique()
+
+source("global_adherencia.R")
 ```
 
 
-```{r funcions, include=FALSE}
-# Funció per generar mapes
+```{r funcio, include=FALSE}
+generar_mapa<-function(gap=1,set_seed=9,dadesprescripcio=dt_prescrits) {
+  # gap<-0 # gap: gap=45
+  # set_seed<-3  # set_seed=12
 
-# Selecciona un id i retorna diagrama de temps, la MPR i adehrencia
-
-generar_mapa<-function(gap=1,set_seed=9) {
-# gap<-0 # gap: gap=45
-# set_seed<-3  # set_seed=12
-
-# 0. Mostrejar id's  
+  # 0. Mostrejar id's
   set.seed(set_seed)
 
-  prescrits_id<-dt_prescrits %>% semi_join(dt_ids %>% sample_n(1),by="idp")
+  prescrits_id<-dadesprescripcio %>% semi_join(dt_ids %>% sample_n(1),by="idp")
   facturats_id<-dt_facturats %>% semi_join(prescrits_id,by="idp")
 
-# 2.agregar solapaments tant de prescrits com facturats
+  # 2.agregar solapaments tant de prescrits com facturats
   prescrits_id<-agregar_solapaments_gaps(dt=prescrits_id,id="idp",datainici =
                                            "dat",datafinal = "dbaixa",gap=gap)
   facturats_id<-facturats_id %>%
     mutate(dat=lubridate::ymd(paste0(as.character(dat),"15")),dbaixa=dat+(30*env)) %>%
     agregar_solapaments_gaps(id="idp",datainici = "dat",datafinal = "dbaixa",gap=gap)
-# 2.2. Juntar prescrits + dispensats
-  total_id<-mutate(prescrits_id,tipus="Prescrit") %>%
-    rbind(mutate(facturats_id,tipus="Dispensat"))
+  # 2.2. Juntar prescrits + dispensats
+  total_id<- mutate(facturats_id,tipus="Facturats") %>% rbind(mutate(prescrits_id,tipus="Prescrits"))
   total_id<-total_id %>% unite(id_kk,c(idp,tipus),remove = F)
-# Mapejar
+  # Mapejar
   mapa<-MAP_ggplot(dades=total_id,datainicial = "dat",datafinal =
-                     "dbaixa",id="id_kk",grup_linea = "tipus",grup_color = "tipus") 
+                     "dbaixa",id="id_kk",grup_linea = "tipus",grup_color = "tipus")
 
-# sumar temps acumulats
+  # sumar temps acumulats
   temps_per_id<-total_id %>% mutate(temps=dbaixa-dat) %>% group_by(idp,tipus) %>%
     summarise(Temps=sum(temps))
-# Generar taulaMPR
+  # Generar taulaMPR
 
   # Si no existeix dispensat = 0
   temps_dispensat<-temps_per_id$Temps[1] %>% as.numeric()
   temps_prescrit<-temps_per_id$Temps[2] %>% as.numeric()
-  
+
   if (is.na(temps_prescrit)) {
     temps_prescrit<-temps_dispensat
     temps_dispensat<-0}
-  
-  tableMPR<-temps_dispensat/temps_prescrit %>% 
-    as_tibble() %>% 
-    select(MPR=value) 
-# 3. Posar-ho en una taula
-  tableMPR<-tableMPR %>% 
+
+  tableMPR<-temps_dispensat/temps_prescrit %>%
+    as_tibble() %>%
+    select(MPR=value)
+  # 3. Posar-ho en una taula
+  tableMPR<-tableMPR %>%
     mutate(D=temps_dispensat,
            P=temps_prescrit,
-         Adherence=if_else(MPR>0.8,"Good: >=0.8","Low: <0.8")) %>% 
+           Adherence=if_else(MPR>0.8,"Good: >=0.8","Low: <0.8")) %>%
     transmute(D,P,MPR=round(MPR,3),Adherence)
 
-subtitul<-paste0("MPR: ",round(tableMPR$MPR,3)," del subjecte: ",total_id$idp[1])
+  subtitul<-paste0("MPR: ",round(tableMPR$MPR,3)," del subjecte: ",total_id$idp[1])
 
 
-mapa+labs(x="Temps", 
-              y="Subjecte",
-              title="Seguiment fàrmacs",
-              subtitle=subtitul)+
-  annotation_custom(gridExtra::tableGrob(tableMPR))
+  mapa+labs(x="Temps",
+            y="Subjecte",
+            title="Seguiment fàrmacs",
+            subtitle=subtitul)+
+    annotation_custom(gridExtra::tableGrob(tableMPR))
 
 }
-
 
 ```
 
@@ -101,33 +98,31 @@ mapa+labs(x="Temps",
 
 - Met+
 
-- "Adherència" & MPR
+- "Adherència" i MPR
 
-- Quines dades disposem?
+- Dades
 
 - Exemples gràfics
 
 - Preprocessament de dades 
 
-- Mapes temporals
-
 - IdMaps
 
-- Análisis i limitacions
+- Anàlisis
 
 </left>
 
-## Estudi Met+ {.smaller}
+## Estudi Met+ {.smaller .build}
 
-- 3 grups DM2 amb inici d'antidiabetics: Sulfonilurea, IDPP-4 o un iSGLT2. 
+- 3 grups Antidiabetics: Sulfonilurea, IDPP-4 o un iSGLT2. 
 
-- Tractats amb metformina previa i insuficient control glucémic.
+- DM2 amb metformina previa i insuficient control glucémic.
 
-- Objectius: Avaluar   
+- Objectius:    
 
     - Principal: Canvis en HbA1c i pes després de l'addició (Fins 24 mesos)
 
-    - Secundari 1....
+    - Secundari 1: ....
     
     - ....
     
@@ -137,10 +132,10 @@ mapa+labs(x="Temps",
 
     - Secundari 5: Adherencia al tratament per cada grup
 
-    - Secundari 6: Suspensions / abandons del tractament (persistencia al tratactamen)
+    - ....
 
 
-## Taxa de possessió de medicament (MPR) {.smaller}
+## Taxa de possessió de medicament | MPR {.smaller}
 
 - The therapeutic adherence will be assessed through pharmacy invoice data (drug dispensing)
 
@@ -161,255 +156,360 @@ On:
 <center> 
  $MPR = \frac{f(D) } { f(P)} \in [0-1]$, 
 
-<font size="4"> on D= Dispensació acumulada, i P = Periode de prescripció </font>
+<font size="4"> on D seria la covertura de la Dispensació, i P = Periode de prescripció </font>
 
 </center> 
 
-| Adherença |  Criteri      |
+| Adherènca |  Criteri      |
 |:---------:+:-------------:|
 | Good      |$MPR \ge 0.8$  |
 | Low       |$MPR < 0.8$    |
 
 <br />
-> Característiques / Assumpcions: 
 
-    - Si D=0 --> MPR=0 
-    - Dispensació va vinculada a una prescripció. Per tant s'ha de complir:
+- Si D=0 implica MPR=0 
+- Dispensació va vinculada a prescripció, Per tant:
     
   $D \le P$ <br/> 
   $D \in P$ <br/>
-  -Si D (observada) > P (observada)  -> MPR=1 
+- Si D (observada) > P (observada)  -> MPR=1 
   
-## Exemples
+## Dades disponibles | Tractament dispensat i prescrit {.smaller}
 
-> Tractament dispensat i prescrit (Dades)
-
-```{r mostrardades}
+```{r mostrardades, out.width=100, out.height=100}
 # Selecciono un identificador
 prescrits_id<-dt_prescrits %>% filter(idp=="acba786c")
 
 facturats_id<-dt_facturats %>% semi_join(prescrits_id,by="idp")
 
-kable(prescrits_id, caption = "Historic de farmacs prescrits") %>% kableExtra::kable_styling()
-kable(facturats_id, caption = "Historic de farmacs dispensats") %>% kableExtra::kable_styling()
+kable(prescrits_id, caption = "Històric de farmacs prescrits") %>% kableExtra::kable_styling()
+kable(facturats_id %>% head(5), caption = "Historic de fàrmacs dispensats") %>% kableExtra::kable_styling()
 
 ```
 
-## Exemple 1 gràfic
+## Exemples | Escenari 1 {.smaller}
 
-> 1. Dispensació i Prescripció
+Dispensació i Prescripció
 
-```{r, message=FALSE,echo=F,results = 'hide'}
+```{r, message=FALSE,echo=F,results = 'hide', fig.asp=0.5}
 # Global
 generar_mapa(gap=0,set_seed=10)
 ```
 
-## Exemple 2 gràfic
+## Exemples | Escenari 2 {.smaller}
 
-> 2. No consta dispensació
+No consta dispensació
 
-```{r, message=FALSE,echo=F,results = 'hide'}
+```{r, message=FALSE,echo=F,results = 'hide', fig.asp=0.5}
 # No consta dispensació
 generar_mapa(gap=0,set_seed=3)
 
 ```
 
-## Exemple 3 gràfic
 
-> 2. Inici de dispensació previa a la prescripció
+## Exemples | Escenari 3 {.smaller}
 
-```{r, message=FALSE,echo=F,results = 'hide'}
-# Inici de dispensació previa a la prescripció
-generar_mapa(gap=0,set_seed=25)
+Dispensació = Prescripció 
 
-```
-
-## Exemple 4 gràfic
-
-> Dispensació = Prescripció 
-
-```{r, message=FALSE,echo=F,results = 'hide'}
+```{r, message=FALSE,echo=F,results = 'hide', fig.asp=0.5}
 # Igual dispesació = P 
 generar_mapa(gap=0,set_seed=41)
 
 ```
 
-## Exemple gràfic
+## Exemples | Escenari 4 {.smaller}
 
-> Més dispensació que prescripció
+Dispensació > Prescripció
 
-```{r, message=FALSE,echo=F,results = 'hide'}
+```{r, message=FALSE,echo=F,results = 'hide', fig.asp=0.5}
 # Més dispensació que prescripció
 generar_mapa(gap=45,set_seed=55)
 
+```
+
+## Exemples | Escenari 5 {.smaller}
+
+Inici de dispensació previa a la prescripció
+
+```{r, message=FALSE,echo=F,results = 'hide', fig.asp=0.5}
+# Inici de dispensació previa a la prescripció
+generar_mapa(gap=0,set_seed=25)
+
+```
+
+## Procesament de dades 
+
+Previ al càlcul del període de prescripció teoric i temps de dispensanció
+    
+    
+1. Actualitzar Prescripció amb Dispensació
+2. Estimar data fi dispensació
+3. Eliminar solapaments / discontinuitats (gaps)
+4. Delimitar finestra de seguiment 
+
+## Procesament de dades {.smaller}
+
+1.Actualitzar periode de prescripció
+
+```{r, fig.asp=0.5}
+generar_mapa(gap=0,set_seed=25)
+
+```
+
+## Procesament de dades {.smaller}
+
+1. Estimar data fi dispensació
+
+
+```{r, fig.asp=0.5}
+# Formatar i fusionar dt_facturats + prescrits
+dt_facturats_formatat<-formatar_facturats(dt_facturats)  
+
+# Fusionar i seleccionar
+prescrits_fusionats<-dt_prescrits %>% bind_rows(dt_facturats_formatat) 
+
+prescrits_fusionats_id<-prescrits_fusionats %>% filter(idp=="d86f1c2b")
+
+generar_mapa(gap=0,set_seed=25,dadesprescripcio = prescrits_fusionats_id)
+
 
 ```
 
 
-## Quines dades disposem? {.smaller}
+## Procesament de dades {.smaller}
 
-> Historic de prescripcions (2 pacients)
+2.Estimació de dispensació
 
-```{r dades, echo=F, message=FALSE}
-prescrits_id<-mostreig_ids(dt=dt_prescrits,id="idp",set_seed=11,n_mostra = 1)
-kable(prescrits_id) %>% kableExtra::kable_styling()
+```{r, out.width=100, out.height=100}
 
-prescrits_id<-mostreig_ids(dt=dt_prescrits,id="idp",set_seed=10,n_mostra = 1)
-kable(prescrits_id) %>% kableExtra::kable_styling()
+llavor<-123
+
+dt_facturats %>% mostreig_ids(n_mostra = 5,set_seed = llavor) %>% filter(agr=="SU") %>% head(3) %>% kable(caption = "Dades de facturació crues") %>% kableExtra::kable_styling() 
+
+mostra_facturats<-formatar_facturats(dt_facturats) %>% mostreig_ids(n_mostra = 5,set_seed = llavor) %>% filter(agr=="SU")
+
+mostra_facturats %>% head(3) %>% kable(caption = "Dades de facturació precuinades") %>% kableExtra::kable_styling() 
+
 
 ```
 
+## Procesament de dades {.smaller}
 
-## Mapa temporal de prescripcions
+### 2.Estimació de dispensació
 
-> Prescripció SU (n=1)
+Historic de facturacions (n=5) de Sulfunilurea
 
-```{r, fig1, fig.asp=0.5}
+- Data inici asumim 15 de cada mes
+- Data fi depén de la posologia i la dosis (Depén del fàrmac)
+- S'asumpció general 1 envás = 30 dies
+- Aplicació de factor de conversió (En funció de dosis i per tant covertura)
+
+## Procesament de dades {.smaller}
+
+### 2.Estimació de dispensació
+
+Historic de facturacions (n=5) de Sulfunilurea
+
+```{r, fig.asp=0.40}
+# Genero datafi # (123)
+llavor<-16
+llavor<-21
+llavor<-1
+llavor<-31
+
+mostra_facturats<-formatar_facturats(dt_facturats) %>% mostreig_ids(n_mostra = 10,set_seed = llavor) %>% filter(agr=="SU")
 
 
-MAP_ggplot(dades=prescrits_id,datainicial = "dat",datafinal = "dbaixa",
+MAP_ggplot(dades=mostra_facturats,datainicial = "dat",datafinal = "dbaixa",
+            id="idp",grup_color = "cod")
+
+```
+
+## Procesament de dades {.smaller}
+
+### 2.Estimació de dispensació
+
+Historic de facturacions (n=5) de Sulfunilurea
+
+Dades cuinades després d'aplicar factor de conversió
+
+```{r, fig.asp=0.40}
+
+mostra_facturats_post<-formatar_factor_conversio(mostra_facturats)
+
+
+MAP_ggplot(dades=mostra_facturats_post,datainicial = "dat",datafinal = "dbaixa",
             id="idp",grup_color = "cod")
 
 
+```
+
+## Procesament de dades {.smaller}
+
+### 3.Eliminar solapaments / discontinuitats (gaps)
+
+> Després de fusionar prescripcions + facturacions 
+> Eliminar discontinuitats
+
+```{r, fig.asp=0.4}
+
+mostra_facturats_post2<-agregar_solapaments_gaps(dt=mostra_facturats_post,id="idp",datainici = "dat",datafinal = "dbaixa",gap=45)
+
+MAP_ggplot(dades=mostra_facturats_post2,datainicial = "dat",datafinal = "dbaixa",
+            id="idp")
+
 
 ```
 
-## Mapa temporal de prescripcions
+## Procesament de dades {.smaller}
+
+### 4.Delimitar finestra de seguiment
+
+> Fins 24 mesos / fi de seguiment o prematura finalització (Mort / Trasllat) 
+
+```{r, fig.asp=0.4}
+# Facturats:  
+mostra_facturats_post3 <- mostra_facturats_post2 %>% left_join(dt_metplus,by="idp") 
+
+# Agregar temps acumulat dins de finestra temporal per idp (entre dues dates: dtindex y datafiOT)
+
+MAP_ggplot(dades=mostra_facturats_post3,datainicial = "dat",datafinal = "dbaixa",id="idp",add_point="datafi_seguiment",grup_color = "grup")
+
+
+```
+
+
+## Procesament de dades | Finestra de seguiment {.smaller}
+
+4.Delimitar finestra de seguiment
+
+Fins 24 mesos o prematura finalització (Mort / Trasllat) previ a 31/12/2017
+
+```{r, fig.asp=0.4}
+
+# Truncament en datafi_deguiment
+mostra_facturats_post4<-mostra_facturats_post3 %>% truncament_farmacs(data_inferior="dtindex",data_superior="datafi_seguiment")
+
+MAP_ggplot(mostra_facturats_post4,datainicial = "dat",datafinal = "dbaixa",id="idp",add_point="datafi_seguiment",grup_color = "grup")
+
+
+```
+
+## Resum | Dispensació {.smaller}
+
+> Dispensació SU (n=10) per ATC
+
+```{r, fig.asp=0.5,echo=F}
+
+# Mostreig 
+prescrits_id<-dt_prescrits %>% filter(agr=="SU") %>% mostreig_ids(id="idp",set_seed=101,n_mostra = 10)
+
+facturats_idp<-dt_facturats %>% 
+  formatar_facturats() %>% 
+  semi_join(prescrits_id,by="idp") %>% 
+  filter(agr=="SU") 
+  
+MAP_ggplot(dades=facturats_idp,datainicial = "dat",datafinal = "dbaixa",
+            id="idp",grup_color = "cod")
+
+```
+
+## Resum | Dispensació {.smaller}
+
+> Dispensació: Fi dispensació i eliminem solapaments i discontinuitats
+
+```{r, fig.asp=0.5,echo=F}
+
+facturats_idp<-facturats_idp %>% 
+  formatar_factor_conversio() %>% 
+  agregar_solapaments_gaps(id="idp",gap=45,datainici = "dat",datafinal = "dbaixa")
+  
+
+MAP_ggplot(dades=facturats_idp,datainicial = "dat",datafinal = "dbaixa",id="idp")
+
+
+
+```
+
+## Resum | Prescripció {.smaller}
 
 > Prescripció SU (n=10) per ATC
 
 ```{r, fig2, fig.asp=0.5,echo=F}
+
 prescrits_id<-dt_prescrits %>% 
   filter(agr=="SU") %>%
   mostreig_ids(id="idp",set_seed=101,n_mostra = 10)
 
 MAP_ggplot(dades=prescrits_id,datainicial = "dat",datafinal = "dbaixa",
             id="idp",grup_color = "cod")
-```
-
-
-## Mapa temporal de prescripcions
-
-> 10 pacients amb prescripcions Sulfonorea
-
-```{r, fig3, fig.asp=0.50,echo=F}
-
-MAP_ggplot(dades=prescrits_id,datainicial = "dat",datafinal = "dbaixa",
-            id="idp",grup_color = "agr")
 
 ```
 
+## Resum | Prescripció {.smaller}
 
-## Mapa temporal de prescripcions
-
-> Prescripcions de Sulfonorea després d'eliminar solapaments
-
-```{r, fig.asp=0.5, echo=F, include=F}
-prescrits_id<-agregar_solapaments_gaps(dt=prescrits_id,id="idp",datainici = "dat",datafinal = "dbaixa",gap=45)
-
-```
+> Actualització mitjaçant la dispensació disponible
 
 
-```{r, fig.asp=0.5, echo=F}
+```{r, fig.asp=0.5,echo=F}
 
-MAP_ggplot(dades=prescrits_id,datainicial = "dat",datafinal = "dbaixa",
-        id="idp")
+# 1. Donar format a facturats + 2. factor de conversió + 3. Afegir a prescripció
+prescrits_id_format<-dt_facturats %>% 
+  formatar_facturats() %>% 
+  formatar_factor_conversio() %>% mutate(tipus="Dispensat") %>% 
+  bind_rows(mutate(dt_prescrits,tipus="Prescrit")) %>% semi_join(prescrits_id,by="idp")
 
-```
+MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
+            id="idp",grup_linea = "tipus",grup_color = "tipus")
 
-## Mapa temporal de prescripcions
 
-> Temps de seguiment màxim a 24 mesos
-
-```{r, fig.asp=0.5, echo=F, include=F}
-prescrits_id<-agregar_solapaments_gaps(dt=prescrits_id,id="idp",datainici = "dat",datafinal = "dbaixa",gap=45)
-prescrits_id<-prescrits_id %>% left_join(dt_metplus)
-```
-
-```{r, fig.asp=0.5, echo=F}
-MAP_ggplot(dades=prescrits_id,datainicial = "dat",datafinal = "datafiOT",id="idp")
 
 ```
 
 
-## Dispensacions (Que tenim?) {.smaller}
+## Resum | Prescripció {.smaller}
 
-> Mostra d'historic de dispensacions
+> Eliminem solapaments i gaps
 
+```{r, fig.asp=0.5,echo=F}
 
-```{r, message=FALSE }
-facturats_id<-dt_facturats %>% inner_join(prescrits_id %>% distinct(idp)) %>% filter(agr=="SU")
+# 1. Donar format a facturats + 2. factor de conversió + 3. Afegir a prescripció 
+# 4 Eliminar solapaments
+prescrits_id_format<-dt_facturats %>% 
+  formatar_facturats() %>% 
+  formatar_factor_conversio() %>% mutate(tipus="Dispensat") %>% 
+  bind_rows(mutate(dt_prescrits,tipus="Prescrit")) %>% semi_join(prescrits_id,by="idp") %>% 
+  agregar_solapaments_gaps(id="idp",gap=45,datainici = "dat",datafinal = "dbaixa")
 
-kable(facturats_id %>% head(10)) %>% kableExtra::kable_styling() 
-
-```
-
-## Mapa temporal de dispensacions
-
-> 10 pacients amb prescripcions de Sulfonorea
-
-```{r, fig.asp=0.50,echo=F}
-
-# Genero datafi # 
-facturats_id<-facturats_id %>% 
-  mutate(dat=lubridate::ymd(paste0(as.character(dat),"15")),datafi=dat+(30*env))
-
-MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafi",
-            id="idp",grup_color = "cod")
-
-```
-
-
-## Mapa temporal de dispensacions
-
-> Aplicant factor de conversió
-
-```{r, fig.asp=0.50,echo=F, warning = FALSE}
-
-conductor_facmacs<-read_excel(here::here("dades","cataleg_met.xls"),col_types = "text") %>% 
-  select(cod,factor_conversio_farmacs) %>% filter(!is.na(factor_conversio_farmacs)) %>% unique()
-
-# Factor de conversió en funció de DDD 
-facturats_id<-facturats_id %>% 
-  dplyr::left_join(conductor_facmacs, by="cod") %>% 
-  mutate(env=env*as.numeric(factor_conversio_farmacs)) %>% 
-  select(-factor_conversio_farmacs) 
-
-# Genero datafi en funció dels envasos # 
-facturats_id<-facturats_id %>%  mutate(datafi=dat+(30*env)) 
-
-MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafi",
-            id="idp",grup_color = "cod")
-
-```
-
-## Mapa temporal de dispensacions
-
-> Eliminar discontinuitats i solapaments
-
-```{r, fig.asp=0.50,echo=F, warning = FALSE,results = 'hide'}
-
-facturats_id<-facturats_id %>% filter(agr=="SU")
-
-facturats_id<-agregar_solapaments_gaps(dt=facturats_id,id="idp",datainici = "dat",datafinal = "datafi",gap=92)
-  
-MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafi",
+MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
             id="idp")
 
 ```
 
-## Mapa temporal de dispensacions
+## Resum | Prescripció {.smaller}
 
-> Finestra temporal inferior o igual a 24 mesos
+> Trunquem a final de seguiment
 
-```{r, fig.asp=0.50,echo=F, warning = FALSE}
-facturats_id<-facturats_id %>% left_join(dt_metplus,by="idp")
+```{r, fig.asp=0.5,echo=F}
 
+# 1. Donar format a facturats + 2. factor de conversió + 3. Afegir a prescripció 
+# 4 Eliminar solapaments 
+# 5.Trunquem a finestra 
+prescrits_id_format<-dt_facturats %>% 
+  formatar_facturats() %>% 
+  formatar_factor_conversio() %>% mutate(tipus="Dispensat") %>% 
+  bind_rows(mutate(dt_prescrits,tipus="Prescrit")) %>% semi_join(prescrits_id,by="idp") %>% 
+  agregar_solapaments_gaps(id="idp",gap=45,datainici = "dat",datafinal = "dbaixa") %>% 
+  left_join(dt_metplus) %>% 
+  truncament_farmacs(data_inferior = "dtindex",data_superior = "datafiOT")
+  
 
-MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafiOT",id="idp")
+MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
+            id="idp")
+
 ```
 
-## Aplicació Shiny per mapejar registres clínics (IdMaps)
+## Mapejar registres clínics | Aplicació Shiny
 
 > [IdMaps](https://www.shinyapps.io/admin/#/dashboard): Eina per visualitzar dades longitudinals
 
@@ -420,25 +520,25 @@ MAP_ggplot(dades=facturats_id,datainicial = "dat",datafinal = "datafiOT",id="idp
 
 - Visualitzar historics (longitudinals)
 
-- Ajuda planificar indicadors
+- Ajudar planificar indicadors
 
 
 > Parametres (SU, llavor=114, n=10)
 
 
-## Analisis de dades
+## Anàlisis de dades
 
-- Analisis Sota tractament (On treatment)
+* Analisis Sota tractament (On treatment)
 
-- Definir finalització de tractament dispensat (+3 mesos)
+* Finalització de tractament dispensat (+3 mesos)
 
-- Limitacions: 
+* Consequencies: 
 
-    - Afecta al temps de seguiment i missings:
-    - Reducceix el temps de seguiment 
-    - Variables continues pot haber més missings i decrement del temps promitg de la valoració 
-    - En outcomes tipus esdeveniment, increment del % de censura 
-
+    - Reducció de temps de seguiment 
+    - Increment de missings
+    - Increment del % de censura 
+    
+## Preguntes 
 
 
 
