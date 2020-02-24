@@ -1,7 +1,7 @@
 ---
-title: '"Adherència" basat en registres clínics'
-author: "Jordi Real. USR-BCN "
-date: "03/03/2020"
+title: '"Adherència" basat en registres clínics: Estudi Met+'
+author: "Jordi Real & Ramón Puig. USR Barcelona - DAPCAT"
+date: "03 de Març del 2020"
 output: ioslides_presentation
 footer: "USR Barcelona, DAPCAT 2020"  
 logo: "logoIDIAP.png"
@@ -82,9 +82,9 @@ generar_mapa<-function(gap=1,set_seed=9,dadesprescripcio=dt_prescrits) {
   subtitul<-paste0("MPR: ",round(tableMPR$MPR,3)," del subjecte: ",total_id$idp[1])
 
 
-  mapa+labs(x="Temps",
+  mapa+labs(x="Data",
             y="Subjecte",
-            title="Seguiment fàrmacs",
+            title="Patró de prescripció i facturació d'un tractament durant seguiment",
             subtitle=subtitul)+
     annotation_custom(gridExtra::tableGrob(tableMPR))
 
@@ -102,25 +102,25 @@ generar_mapa<-function(gap=1,set_seed=9,dadesprescripcio=dt_prescrits) {
 
 - Dades
 
-- Exemples gràfics
+- Exemples: Mapeig gràfic de dades
 
 - Preprocessament de dades 
 
 - IdMaps
 
-- Anàlisis
+- Anàlisi
 
 </left>
 
 ## Estudi Met+ {.smaller .build}
 
-- 3 grups Antidiabetics: Sulfonilurea, IDPP-4 o un iSGLT2. 
+- 3 grups Antidiabetics orals (ADO): Sulfonilurea, IDPP-4, iSGLT2 
 
-- DM2 amb metformina previa i insuficient control glucémic.
+- Pacients DM2 tractats amb metformina i insuficient control glucémic
 
 - Objectius:    
 
-    - Principal: Canvis en HbA1c i pes després de l'addició (Fins 24 mesos)
+    - Principal: Evaluar canvis en HbA1c i pes (Fins 24 mesos)
 
     - Secundari 1: ....
     
@@ -130,7 +130,7 @@ generar_mapa<-function(gap=1,set_seed=9,dadesprescripcio=dt_prescrits) {
     
     - ....
 
-    - Secundari 5: Adherencia al tratament per cada grup
+    - Secundari 5: Adherència de cada grup de tratament
 
     - ....
 
@@ -147,16 +147,16 @@ $MPR = \frac{TempsDispensació(D)} {TempsTranscorregut(P)}$
 
 On: 
 
-- D: Temps de dispensat ("real) del farmac d'estudi
+- D: Temps de dispensat ("real") del fàrmac d'estudi
 
-- P: Temps prescrit ("teoric") durant periode de seguiment o fins la prematura finalització
+- P: Temps prescrit ("teoric") durant període de seguiment o fins la prematura finalització
 
 ## Adherència {.smaller}
 
 <center> 
  $MPR = \frac{f(D) } { f(P)} \in [0-1]$, 
 
-<font size="4"> on D seria la covertura de la Dispensació, i P = Periode de prescripció </font>
+<font size="4"> on f(D) és la covertura de la **dispensació**, i f(P) = Període de **prescripció** </font>
 
 </center> 
 
@@ -167,14 +167,14 @@ On:
 
 <br />
 
-- Si D=0 implica MPR=0 
+- Si D=0 --> MPR=0 
 - Dispensació va vinculada a prescripció, Per tant:
     
   $D \le P$ <br/> 
   $D \in P$ <br/>
-- Si D (observada) > P (observada)  -> MPR=1 
+  Si $D(observada) \ge P(observada)$: MPR=1 
   
-## Dades disponibles | Tractament dispensat i prescrit {.smaller}
+## Dades disponibles | Tractament dispensat i prescrit segons dades SIDIAP {.smaller}
 
 ```{r mostrardades, out.width=100, out.height=100}
 # Selecciono un identificador
@@ -182,14 +182,14 @@ prescrits_id<-dt_prescrits %>% filter(idp=="acba786c")
 
 facturats_id<-dt_facturats %>% semi_join(prescrits_id,by="idp")
 
-kable(prescrits_id, caption = "Històric de farmacs prescrits") %>% kableExtra::kable_styling()
-kable(facturats_id %>% head(5), caption = "Historic de fàrmacs dispensats") %>% kableExtra::kable_styling()
+kable(prescrits_id, caption = "Històric de fàrmacs prescrits d'un pacient") %>% kableExtra::kable_styling()
+kable(facturats_id %>% head(5), caption = "Històric de fàrmacs dispensats d'un pacient") %>% kableExtra::kable_styling()
 
 ```
 
 ## Exemples | Escenari 1 {.smaller}
 
-Dispensació i Prescripció
+$Dispensació \in Prescripció$
 
 ```{r, message=FALSE,echo=F,results = 'hide', fig.asp=0.5}
 # Global
@@ -237,28 +237,27 @@ generar_mapa(gap=0,set_seed=25)
 
 ```
 
-## Procesament de dades 
+## Procesament de dades | Període de prescripció i temps de dispensanció 
 
-Previ al càlcul del període de prescripció teoric i temps de dispensanció
-    
-    
-1. Actualitzar Prescripció amb Dispensació
-2. Estimar data fi dispensació
-3. Eliminar solapaments / discontinuitats (gaps)
+<br>
+
+1. Actualitzar Prescripció amb dispensació
+
+2. Estimar data fi de dispensació
+
+3. Eliminar solapaments i discontinuïtats (gaps)
+
 4. Delimitar finestra de seguiment 
 
-## Procesament de dades {.smaller}
+## Procesament de dades | 1. Actualitzar prescripció {.smaller}
 
-1.Actualitzar periode de prescripció
 
 ```{r, fig.asp=0.5}
 generar_mapa(gap=0,set_seed=25)
 
 ```
 
-## Procesament de dades {.smaller}
-
-1. Estimar data fi dispensació
+## Procesament de dades | 1. Actualitzar prescripció {.smaller}
 
 
 ```{r, fig.asp=0.5}
@@ -276,9 +275,9 @@ generar_mapa(gap=0,set_seed=25,dadesprescripcio = prescrits_fusionats_id)
 ```
 
 
-## Procesament de dades {.smaller}
+## Procesament de dades | 2. Estimació de dispensació {.smaller}
 
-2.Estimació de dispensació
+
 
 ```{r, out.width=100, out.height=100}
 
@@ -293,28 +292,25 @@ mostra_facturats %>% head(3) %>% kable(caption = "Dades de facturació precuinad
 
 ```
 
-## Procesament de dades {.smaller}
+## Procesament de dades | 2. Estimació de dispensació 
 
-### 2.Estimació de dispensació
 
-Historic de facturacions (n=5) de Sulfunilurea
+<br />
 
-- Data inici asumim 15 de cada mes
-- Data fi depén de la posologia i la dosis (Depén del fàrmac)
-- S'asumpció general 1 envás = 30 dies
-- Aplicació de factor de conversió (En funció de dosis i per tant covertura)
+- Data inici: Asumim 15 de cada mes
 
-## Procesament de dades {.smaller}
+- Data fi: Depén de la posologia i la dosi (Depén de cada fàrmac)
 
-### 2.Estimació de dispensació
+    - Assumpció general: 1 envás ADO = 30 dies
 
-Historic de facturacions (n=5) de Sulfunilurea
+    - Ajust per factor de conversió segons dosi i per tant cobertura
 
-```{r, fig.asp=0.40}
+## Procesament de dades | 2. Estimació de dispensació {.smaller}
+
+Històric de facturacions (n=4) de Sulfunilurea assumint **30 dies** de cobertura per envàs
+
+```{r, fig.asp=0.5}
 # Genero datafi # (123)
-llavor<-16
-llavor<-21
-llavor<-1
 llavor<-31
 
 mostra_facturats<-formatar_facturats(dt_facturats) %>% mostreig_ids(n_mostra = 10,set_seed = llavor) %>% filter(agr=="SU")
@@ -325,15 +321,11 @@ MAP_ggplot(dades=mostra_facturats,datainicial = "dat",datafinal = "dbaixa",
 
 ```
 
-## Procesament de dades {.smaller}
+## Procesament de dades | 2. Estimació de dispensació {.smaller}
 
-### 2.Estimació de dispensació
+Històric de facturacions (n=5) de Sulfunilurea aplicant **factor de conversió**
 
-Historic de facturacions (n=5) de Sulfunilurea
-
-Dades cuinades després d'aplicar factor de conversió
-
-```{r, fig.asp=0.40}
+```{r, fig.asp=0.5}
 
 mostra_facturats_post<-formatar_factor_conversio(mostra_facturats)
 
@@ -344,14 +336,11 @@ MAP_ggplot(dades=mostra_facturats_post,datainicial = "dat",datafinal = "dbaixa",
 
 ```
 
-## Procesament de dades {.smaller}
+## Procesament de dades | 3. Eliminar solapaments i discontinuïtats {.smaller}
 
-### 3.Eliminar solapaments / discontinuitats (gaps)
+Dades processades post **eliminació de discontinuïtats i solapaments**
 
-> Després de fusionar prescripcions + facturacions 
-> Eliminar discontinuitats
-
-```{r, fig.asp=0.4}
+```{r, fig.asp=0.5}
 
 mostra_facturats_post2<-agregar_solapaments_gaps(dt=mostra_facturats_post,id="idp",datainici = "dat",datafinal = "dbaixa",gap=45)
 
@@ -361,13 +350,11 @@ MAP_ggplot(dades=mostra_facturats_post2,datainicial = "dat",datafinal = "dbaixa"
 
 ```
 
-## Procesament de dades {.smaller}
+## Procesament de dades |  4. Delimitar finestra de seguiment {.smaller}
 
-### 4.Delimitar finestra de seguiment
+Seguiment fins 24 mesos, 31/12/2017 o prematura finalització (defunció /trasllat)
 
-> Fins 24 mesos / fi de seguiment o prematura finalització (Mort / Trasllat) 
-
-```{r, fig.asp=0.4}
+```{r, fig.asp=0.5}
 # Facturats:  
 mostra_facturats_post3 <- mostra_facturats_post2 %>% left_join(dt_metplus,by="idp") 
 
@@ -379,13 +366,11 @@ MAP_ggplot(dades=mostra_facturats_post3,datainicial = "dat",datafinal = "dbaixa"
 ```
 
 
-## Procesament de dades | Finestra de seguiment {.smaller}
+## Procesament de dades |  4. Delimitar finestra de seguiment {.smaller}
 
-4.Delimitar finestra de seguiment
+Seguiment fins 24 mesos, 31/12/2017 o prematura finalització (defunció/trasllat)
 
-Fins 24 mesos o prematura finalització (Mort / Trasllat) previ a 31/12/2017
-
-```{r, fig.asp=0.4}
+```{r, fig.asp=0.5}
 
 # Truncament en datafi_deguiment
 mostra_facturats_post4<-mostra_facturats_post3 %>% truncament_farmacs(data_inferior="dtindex",data_superior="datafi_seguiment")
@@ -395,14 +380,17 @@ MAP_ggplot(mostra_facturats_post4,datainicial = "dat",datafinal = "dbaixa",id="i
 
 ```
 
-## Resum | Dispensació {.smaller}
+## Resum | Mapeig de dispensacions {.smaller}
 
-> Dispensació SU (n=10) per ATC
+Dades originals de dispensacions: Mostreig de 5 pacients per ATC
 
 ```{r, fig.asp=0.5,echo=F}
 
+# llavor<-101
+llavor<-110
+
 # Mostreig 
-prescrits_id<-dt_prescrits %>% filter(agr=="SU") %>% mostreig_ids(id="idp",set_seed=101,n_mostra = 10)
+prescrits_id<-dt_prescrits %>% filter(agr=="SU") %>% mostreig_ids(id="idp",set_seed=llavor,n_mostra = 5)
 
 facturats_idp<-dt_facturats %>% 
   formatar_facturats() %>% 
@@ -414,11 +402,11 @@ MAP_ggplot(dades=facturats_idp,datainicial = "dat",datafinal = "dbaixa",
 
 ```
 
-## Resum | Dispensació {.smaller}
+## Resum | Mapeig de dispensacions {.smaller}
 
-> Dispensació: Fi dispensació i eliminem solapaments i discontinuitats
+Dades processades: Post estimació de fi de coberura, eliminació de gaps i solapaments
 
-```{r, fig.asp=0.5,echo=F}
+```{r, fig.asp=0.5,echo=F, fig.cap="Mapeig de l'històric de dispensació de 10 pacients",fig.align="center"}
 
 facturats_idp<-facturats_idp %>% 
   formatar_factor_conversio() %>% 
@@ -431,24 +419,24 @@ MAP_ggplot(dades=facturats_idp,datainicial = "dat",datafinal = "dbaixa",id="idp"
 
 ```
 
-## Resum | Prescripció {.smaller}
+## Resum | Mapeig de prescripcions {.smaller}
 
-> Prescripció SU (n=10) per ATC
+Dades originals de prescripcions
 
 ```{r, fig2, fig.asp=0.5,echo=F}
 
 prescrits_id<-dt_prescrits %>% 
   filter(agr=="SU") %>%
-  mostreig_ids(id="idp",set_seed=101,n_mostra = 10)
+  mostreig_ids(id="idp",set_seed=llavor,n_mostra = 5)
 
 MAP_ggplot(dades=prescrits_id,datainicial = "dat",datafinal = "dbaixa",
             id="idp",grup_color = "cod")
 
 ```
 
-## Resum | Prescripció {.smaller}
+## Resum | Mapeig de prescripcions {.smaller}
 
-> Actualització mitjaçant la dispensació disponible
+Dades processades: **Actualització amb dispensació**
 
 
 ```{r, fig.asp=0.5,echo=F}
@@ -467,9 +455,9 @@ MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
 ```
 
 
-## Resum | Prescripció {.smaller}
+## Resum | Mapeig de prescripcions {.smaller}
 
-> Eliminem solapaments i gaps
+Dades processades: Actualització amb dispensació + **eliminats solapaments i gaps**
 
 ```{r, fig.asp=0.5,echo=F}
 
@@ -486,9 +474,9 @@ MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
 
 ```
 
-## Resum | Prescripció {.smaller}
+## Resum | Mapeig de prescripcions {.smaller}
 
-> Trunquem a final de seguiment
+Dades processades: Actualització amb dispensació + eliminats de solapaments i gaps + **truncament final de seguiment**
 
 ```{r, fig.asp=0.5,echo=F}
 
@@ -518,27 +506,40 @@ MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
 
 - Validar i controlar processos
 
-- Visualitzar historics (longitudinals)
+- Visualitzar històrics (longitudinals)
 
-- Ajudar planificar indicadors
+- Planificar indicadors
+
+- Detecció d'errades (Descartar objectius) 
 
 
-> Parametres (SU, llavor=114, n=10)
+<font size="2"> Paràmetres (SU, n=1-4, llavor=201) </font>
 
 
-## Anàlisis de dades
 
-* Analisis Sota tractament (On treatment)
+## Anàlisi de dades
+
+* Anàlisi sota tractament (On treatment)
 
 * Finalització de tractament dispensat (+3 mesos)
 
-* Consequencies: 
+* Conseqüències: 
 
     - Reducció de temps de seguiment 
     - Increment de missings
     - Increment del % de censura 
-    
-## Preguntes 
+
+
+---   
+
+# Gràcies Moltes
+
+<br>
+
+**Jordi Real & Ramón Puig** 
+
+USR-Barcelona, DAP-CAT <br>  
+25 de Febrer del 2020
 
 
 
