@@ -1,7 +1,8 @@
 ---
 title: '"Adherència" basat en registres clínics: Estudi Met+'
-author: "Jordi Real & Ramón Puig. USR Barcelona - DAPCAT"
-date: "03 de Març del 2020"
+author: "Jordi Real - Ramón Puig. USR Barcelona; DAPCAT"
+institute: "USR Barcelona - DAPCAT"
+date: "25 de febrer del 2020"
 output: ioslides_presentation
 footer: "USR Barcelona, DAPCAT 2020"  
 logo: "logoIDIAP.png"
@@ -538,7 +539,8 @@ MAP_ggplot(dades=prescrits_id_format,datainicial = "dat",datafinal = "dbaixa",
 
 **Jordi Real & Ramón Puig** 
 
-USR-Barcelona, DAP-CAT <br>  
+USR-Barcelona, DAP-CAT <br> 
+IDIAP Jordi Gol
 25 de Febrer del 2020
 
 
